@@ -84,18 +84,11 @@ def get_model(config, attributes, classes, offset):
             # print("Evaluating test dataset:")
             # test_result = evaluate(model, test_dataset, config)
         model = Troika_Pro_OT_StageII(config, attributes=attributes, classes=classes, offset=offset, original_model=model_original)
-    # elif config.model_name == 'clip_multi_path':
-    # elif config.model_name == 'clip_multi_path':
-    #     model = CLIP_Multi_Path(config, attributes=attributes, classes=classes, offset=offset)
-    # elif config.model_name == 'coop_multi_path':
-    #     model = COOP_Multi_Path(config, attributes=attributes, classes=classes, offset=offset)
+
     elif config.model_name == 'troika_clip':
         shutil.copy('./model/troika_clip.py',config.save_path)
         model = Troika_CLIP(config, attributes=attributes, classes = classes, offset=offset)
         
-    elif config.model_name == 'troika_tpt':
-        shutil.copy('./model/troika_tpt.py',config.save_path)
-        model = Troika_TPT(config, attributes=attributes, classes=classes, offset=offset)
         
     else:
         raise NotImplementedError(
