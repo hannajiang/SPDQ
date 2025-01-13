@@ -17,4 +17,5 @@ sh download_data.sh
 CUDA_VISIBLE_DEVICES=0 python -u train.py --yml.path xxxx.yml
 ```
 
-If you want to test the trained model, please set load_model is not None.
+If you want to test the trained model, please set --load_model is not None.
+
