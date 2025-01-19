@@ -134,7 +134,7 @@ class AdapterAO(nn.Module):
 
         self.down_proj = nn.Linear(self.n_embd, self.down_size)
         self.non_linear_func = nn.ReLU()
-        self.up_proj = nn.Linear(self.down_size, self.n_embd)
+        self.up_proj_att = nn.Linear(self.down_size, self.n_embd)
 
         
         self.dropout = dropout
@@ -142,23 +142,24 @@ class AdapterAO(nn.Module):
 
         ##
         self.up_proj_obj = nn.Linear(self.down_size, self.n_embd)
-        # self.tfts_gamma_att, self.tfts_beta_att = init_tfts(1024)
-        # self.tfts_gamma_obj, self.tfts_beta_obj = init_tfts(1024)
-        # self.non_linear_func_2 = nn.GELU()
+        ###
+        self.tfts_gamma_att, self.tfts_beta_att = init_tfts(1024)
+        self.tfts_gamma_obj, self.tfts_beta_obj = init_tfts(1024)
+        self.non_linear_func_2 = nn.GELU()
         
         ####
-        self.dap_downsample_att = nn.Linear(257, 1)
-        nn.init.zeros_(self.dap_downsample_att.weight)
-        nn.init.zeros_(self.dap_downsample_att.bias)
-        # self.dap_film = nn.Linear(dap_config.TASK_EMB, config.hidden_size * 2)
-        self.dap_norm_att = LayerNorm(self.n_embd, eps=1e-6)
+        # self.dap_downsample_att = nn.Linear(257, 1)
+        # nn.init.zeros_(self.dap_downsample_att.weight)
+        # nn.init.zeros_(self.dap_downsample_att.bias)
+        # # self.dap_film = nn.Linear(dap_config.TASK_EMB, config.hidden_size * 2)
+        # self.dap_norm_att = LayerNorm(self.n_embd, eps=1e-6)
    
-        ###################
-        self.dap_downsample_obj = nn.Linear(257, 1)
-        nn.init.zeros_(self.dap_downsample_obj.weight)
-        nn.init.zeros_(self.dap_downsample_obj.bias)
-        # self.dap_film = nn.Linear(dap_config.TASK_EMB, config.hidden_size * 2)
-        self.dap_norm_obj = LayerNorm(self.n_embd, eps=1e-6)
+        # ###################
+        # self.dap_downsample_obj = nn.Linear(257, 1)
+        # nn.init.zeros_(self.dap_downsample_obj.weight)
+        # nn.init.zeros_(self.dap_downsample_obj.bias)
+        # # self.dap_film = nn.Linear(dap_config.TASK_EMB, config.hidden_size * 2)
+        # self.dap_norm_obj = LayerNorm(self.n_embd, eps=1e-6)
         ####
         self.proj_out_att = nn.Identity()#nn.Linear(self.n_embd,768)
         self.proj_out_obj = nn.Identity()#nn.Linear(self.n_embd,768)
@@ -173,8 +174,8 @@ class AdapterAO(nn.Module):
             with torch.no_grad():
                 nn.init.kaiming_uniform_(self.down_proj.weight, a=math.sqrt(5))
                 nn.init.zeros_(self.down_proj.bias)
-                nn.init.zeros_(self.up_proj.weight)
-                nn.init.zeros_(self.up_proj.bias)
+                nn.init.zeros_(self.up_proj_att.weight)
+                nn.init.zeros_(self.up_proj_att.bias)
 
                 nn.init.zeros_(self.up_proj_obj.weight)
                 nn.init.zeros_(self.up_proj_obj.bias)
@@ -188,7 +189,7 @@ class AdapterAO(nn.Module):
         down = self.down_proj(x)
         # down = self.non_linear_func(down)
         # down = nn.functional.dropout(down, p=self.dropout, training=self.training)
-        up_att = self.up_proj(down)
+        up_att = self.up_proj_att(down)
 
         up_obj = self.up_proj_obj(down)
         
@@ -208,34 +209,35 @@ class AdapterAO(nn.Module):
             output = up
         
         
-        # adapter_prompt_att = self.non_linear_func_2(up_att).mean(dim=0, keepdim=True)
-        # adapter_prompt_att = apply_tfts(adapter_prompt_att, self.tfts_gamma_att, self.tfts_beta_att)
+        adapter_prompt_att = self.non_linear_func_2(up_att).mean(dim=0, keepdim=True)
+        adapter_prompt_att = apply_tfts(adapter_prompt_att, self.tfts_gamma_att, self.tfts_beta_att)
 
-        # adapter_prompt_obj = self.non_linear_func_2(up_obj).mean(dim=0, keepdim=True)
-        # adapter_prompt_obj = apply_tfts(adapter_prompt_obj, self.tfts_gamma_obj, self.tfts_beta_obj)
-        if x.shape[0] == 257:
-            x_att = scale_att * up_att + residual
-            adapter_trans = self.dap_norm_att(x_att).permute(1,2,0)
-            adapter_prompt_att = self.dap_downsample_att(adapter_trans)
-            adapter_prompt_att  = adapter_prompt_att.permute(2,0,1)
+        adapter_prompt_obj = self.non_linear_func_2(up_obj).mean(dim=0, keepdim=True)
+        adapter_prompt_obj = apply_tfts(adapter_prompt_obj, self.tfts_gamma_obj, self.tfts_beta_obj)
 
-            x_obj = scale_obj * up_obj + residual
-            adapter_trans = self.dap_norm_obj(x_obj).permute(1,2,0)
-            adapter_prompt_obj = self.dap_downsample_obj(adapter_trans)
-            adapter_prompt_obj  = adapter_prompt_obj.permute(2,0,1)
-        else:
+        # if x.shape[0] == 257:
+        #     x_att = scale_att * up_att + residual
+        #     adapter_trans = self.dap_norm_att(x_att).permute(1,2,0)
+        #     adapter_prompt_att = self.dap_downsample_att(adapter_trans)
+        #     adapter_prompt_att  = adapter_prompt_att.permute(2,0,1)
+
+        #     x_obj = scale_obj * up_obj + residual
+        #     adapter_trans = self.dap_norm_obj(x_obj).permute(1,2,0)
+        #     adapter_prompt_obj = self.dap_downsample_obj(adapter_trans)
+        #     adapter_prompt_obj  = adapter_prompt_obj.permute(2,0,1)
+        # else:
             
-            x_att = scale_att * up_att + residual
-            x_att = torch.cat((x_att[:1,:,:],x_att[3:,:,:]),dim=0)
-            adapter_trans = self.dap_norm_att(x_att).permute(1,2,0)
-            adapter_prompt_att = self.dap_downsample_att(adapter_trans)
-            adapter_prompt_att  = adapter_prompt_att.permute(2,0,1)
+        #     x_att = scale_att * up_att + residual
+        #     x_att = torch.cat((x_att[:1,:,:],x_att[3:,:,:]),dim=0)
+        #     adapter_trans = self.dap_norm_att(x_att).permute(1,2,0)
+        #     adapter_prompt_att = self.dap_downsample_att(adapter_trans)
+        #     adapter_prompt_att  = adapter_prompt_att.permute(2,0,1)
             
-            x_obj = scale_obj * up_obj + residual
-            x_obj = torch.cat((x_obj[:1,:,:],x_obj[3:,:,:]),dim=0)
-            adapter_trans = self.dap_norm_obj(x_obj).permute(1,2,0)
-            adapter_prompt_obj = self.dap_downsample_obj(adapter_trans)
-            adapter_prompt_obj  = adapter_prompt_obj.permute(2,0,1)
+        #     x_obj = scale_obj * up_obj + residual
+        #     x_obj = torch.cat((x_obj[:1,:,:],x_obj[3:,:,:]),dim=0)
+        #     adapter_trans = self.dap_norm_obj(x_obj).permute(1,2,0)
+        #     adapter_prompt_obj = self.dap_downsample_obj(adapter_trans)
+        #     adapter_prompt_obj  = adapter_prompt_obj.permute(2,0,1)
 
 
         adapter_prompt = torch.cat([adapter_prompt_att,adapter_prompt_obj],dim=0)
@@ -543,9 +545,12 @@ class DisFormer(nn.Module):
         # att_query = self.norm_att1(self.att_ca(att_query,self.att_proj(att_txt)))
         # obj_query = self.norm_obj1(self.obj_ca(obj_query,self.obj_proj(obj_txt)))
         # com_query = self.norm_com1(self.com_ca(com_query,self.com_proj(com_txt)))
-        att_query = torch.cat((att_query,self.att_proj(att_txt)),dim=1)
-        obj_query = torch.cat((obj_query,self.obj_proj(obj_txt)),dim=1)
-        com_query = torch.cat((com_query,self.com_proj(com_txt)),dim=1)
+        # att_query = torch.cat((att_query,self.att_proj(att_txt)),dim=1)
+        # obj_query = torch.cat((obj_query,self.obj_proj(obj_txt)),dim=1)
+        # com_query = torch.cat((com_query,self.com_proj(com_txt)),dim=1)
+        att_query = torch.cat((self.att_proj(att_txt),att_query),dim=1)
+        obj_query = torch.cat((self.obj_proj(obj_txt),obj_query),dim=1)
+        com_query = torch.cat((self.com_proj(com_txt),com_query),dim=1)
         
         ############
         
@@ -631,8 +636,8 @@ class Troika_MQF(nn.Module):
         self.obj_final_proj = Disentangler2(dim,output_dim)
         self.com_final_proj = Disentangler2(dim,output_dim)
 
-        self.att_multi_proj = Disentangler2(dim*4,output_dim)
-        self.obj_multi_proj = Disentangler2(dim*4,output_dim)
+        # self.att_multi_proj = Disentangler2(dim*4,output_dim)
+        # self.obj_multi_proj = Disentangler2(dim*4,output_dim)
         
         # self.att_former = QueryFormer(output_dim, output_dim//64, self.cross_attn_dropout)
         # self.obj_former = QueryFormer(output_dim, output_dim//64, self.cross_attn_dropout)
@@ -839,8 +844,8 @@ class Troika_MQF(nn.Module):
 
         x = x.permute(1, 0, 2)  # NLD -> LND
         # img_feature = self.clip.visual.transformer(x)
-        att_token_pool = []
-        obj_token_pool = []
+        # att_token_pool = []
+        # obj_token_pool = []
         for i_block in range(self.clip.visual.transformer.layers):
             ###
             # if i_block>0:
@@ -852,7 +857,7 @@ class Troika_MQF(nn.Module):
             #         x[(1+self.num_tokens):, :, :]
             #     ), dim=0)
             # MHA
-            adapt_x = self.additional_visual_params_mhsa[i_block](x, add_residual=False)
+            # adapt_x = self.additional_visual_params_mhsa[i_block](x, add_residual=False)
             # if i_block==0:
             #     adapter_prompt = self.additional_prompt_generator[i_block](x.type(torch.float))
             #     x = torch.cat([x[0:1, :, :], adapter_prompt.type(self.dtype), x[1:, :, :]], dim=0)
@@ -864,8 +869,8 @@ class Troika_MQF(nn.Module):
             x = self.clip.visual.transformer.resblocks[i_block].attention(
                 self.clip.visual.transformer.resblocks[i_block].ln_1(x)
             )
-            x = x + adapt_x + residual
-            # x = x + residual
+            # x = x + adapt_x + residual
+            x = x + residual
 
             # FFN
             i_adapter = i_block #+ self.clip.visual.transformer.layers
@@ -888,12 +893,12 @@ class Troika_MQF(nn.Module):
             elif i_block<23:
                 x = torch.cat([x[0:1, :, :], adapter_prompt, x[3:, :, :]], dim=0)
             else:
-                # x = torch.cat([x[0:1, :, :], adapter_prompt, x[3:, :, :]], dim=0)
-                x = x
+                x = torch.cat([x[0:1, :, :], adapter_prompt, x[3:, :, :]], dim=0)
+                # x = x
                 
             
-            att_token_pool.append(att_token)
-            obj_token_pool.append(obj_token)
+            # att_token_pool.append(att_token)
+            # obj_token_pool.append(obj_token)
         
         img_feature_ori = x.permute(1, 0, 2)  # LND -> NLD
 
@@ -901,13 +906,15 @@ class Troika_MQF(nn.Module):
         if self.clip.visual.proj is not None:
             img_feature = img_feature @ self.clip.visual.proj
         
-        all_att_token = torch.stack(att_token_pool,dim=0).permute(1,0,2)
-        all_obj_token = torch.stack(obj_token_pool,dim=0).permute(1,0,2)
-        
+        # all_att_token = torch.stack(att_token_pool,dim=0).permute(1,0,2)
+        # all_obj_token = torch.stack(obj_token_pool,dim=0).permute(1,0,2)
+        # all_att_token = None
+        # all_obj_token = None
+
         if torch.isnan(x).any() or torch.isinf(x).any():
             pdb.set_trace()
 
-        return img_feature[:, 0, :], img_feature_ori, all_att_token, all_obj_token
+        return img_feature[:, 0, :], img_feature_ori
 
 
     def encode_text(self, token_ids, token_tensors=None, enable_pos_emb=False):
@@ -1109,7 +1116,7 @@ class Troika_MQF(nn.Module):
 
         ####### visual branch ##########
         # batch_img, batch_patch = self.zero_shot_visual(batch_img.type(self.clip.dtype))
-        batch_img, batch_patch, all_att_token, all_obj_token = self.encode_image_with_adapter(batch_img.type(self.clip.dtype))
+        batch_img, batch_patch = self.encode_image_with_adapter(batch_img.type(self.clip.dtype))
         # batch_img, batch_patch = self.visual(batch_img.type(self.clip.dtype)) #batch_img.shape = [bs,768]; batch_patch.shape = [16,257,768]
 
         ####### text branch ############
@@ -1127,6 +1134,8 @@ class Troika_MQF(nn.Module):
             )
 
             all_text_feat.append(idx_text_features)
+            
+            text_batch = text_batch.permute(1,0,2)
             if i_element == 0:
                 com_txt = text_batch[0:1,1:4,:].repeat(b,1,1)
             elif i_element == 1:
@@ -1158,7 +1167,7 @@ class Troika_MQF(nn.Module):
         obj_feat = self.obj_final_proj(obj_feat.mean(dim=1))
         # batch_img_features = [batch_img,att_feat.mean(dim=1),obj_feat.mean(dim=1)]
         # batch_img_features = [batch_img+com_feat.mean(dim=1),att_feat.mean(dim=1),obj_feat.mean(dim=1)]
-        batch_img_features = [batch_img,att_feat,obj_feat]
+        batch_img_features = [batch_img, att_feat, obj_feat]
 
         normalized_img_features = [feats / feats.norm(dim=-1, keepdim=True) for feats in batch_img_features]
 
@@ -1177,7 +1186,7 @@ class Troika_MQF(nn.Module):
         
         loss_kd = 0.0
 
-        loss_kd = 0.01*F.mse_loss(com_feat/ (1e-5+com_feat.norm(dim=-1, keepdim=True)), normalized_img_features[0],reduction="mean")
+        loss_kd = 0.1*F.mse_loss(com_feat/ (1e-5+com_feat.norm(dim=-1, keepdim=True)), normalized_img_features[0],reduction="mean")
         # pdb.set_trace()
         # loss_kd_ = HSIC(F.normalize(att_feat,dim=1), F.normalize(obj_feat,dim=1))
         # com_feat_ = self.pri2com(torch.cat((att_feat,obj_feat),dim=1))
@@ -1188,7 +1197,8 @@ class Troika_MQF(nn.Module):
         # if torch.isnan(loss_kd_).any() or torch.isinf(loss_kd).any():
         #     pdb.set_trace()
         
-
+        # return logits
+    
         if training and pairs is not None:
             zero_shot_image, _ = self.zero_shot_visual(batch[0].cuda().type(self.clip.dtype))
             zs_image = zero_shot_image/zero_shot_image.norm(dim=-1, keepdim=True)
